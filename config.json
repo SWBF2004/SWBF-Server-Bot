@@ -1,0 +1,22 @@
+{
+  "TOKEN": "x",
+  "channel": 1,
+  "OFFSETS" : {
+    "player_joined": {
+      "address": "518740",
+      "length": 4
+    },
+    "player_joining": {
+      "address": "503FF0",
+      "length": 4
+    },
+    "player_names": {
+      "address": "51107C",
+      "length": 1024
+    },
+    "map_changed": {
+      "address": "4E6D6C",
+      "length": 8
+    }
+  }
+}
