@@ -28,7 +28,7 @@ class ServerBot(Client):
         self.__offsets = config['OFFSETS']
         self.__player_joining = BitCountProperty(PostiveChangeEvent(), **self.__offsets[EventNames.PLAYER_JOINING])
         self.__player_joined = BitCountProperty(PostiveChangeEvent(), **self.__offsets[EventNames.PLAYER_JOINED])
-        self.__player_names = StringProperty(ChangeEvent(), **self.__offsets[EventNames.MAP_CHANGED])
+        self.__player_names = StringProperty(ChangeEvent(), **self.__offsets[EventNames.PLAYER_NAMES])
         self.__map_changed = StringProperty(ChangeEvent(), **self.__offsets[EventNames.MAP_CHANGED])
 
         self.__timeout = 0
@@ -46,7 +46,9 @@ class ServerBot(Client):
         async def on_player_joined(old: int, new: int):
             channel = self.get_channel(self.__config['channel'])
             self.__server.players = new
+            names = '\n'.join(self.get_player_names())
             await channel.send(f'New Player joined! Player count: {new}')
+            await channel.send(f'Players: >>> {names}')
 
         @self.event
         async def on_map_changed(old: str, new: str):
@@ -65,7 +67,23 @@ class ServerBot(Client):
             self.__timeout = time()
             self.dispatch(EventNames.MAP_CHANGED, *self.__map_changed.get())
 
-        if time() - self.__timeout > 30:
+        if time() - self.__timeout > 10:
             if self.__player_joined.read(self.__process):
                 self.__timeout = 0
                 self.dispatch(EventNames.PLAYER_JOINED, *self.__player_joined.get())
+
+    def get_player_names(self):
+        addr = int(self.__offsets[EventNames.PLAYER_NAMES]["address"], 16)
+        length = max(1, self.__server.players) * 456
+        players = self.__process.read(addr, length)
+
+        if players[0] == 0x00:
+            return
+
+        names = []
+        for idx in range(self.__server.players):
+            name = players[idx * 456:idx * 456 + 32].decode(encoding='utf-8').rstrip('\x00')
+            if name[0] != 0x00:
+                names.append(name)
+
+        return names
