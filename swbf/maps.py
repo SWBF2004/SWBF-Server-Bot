@@ -11,7 +11,7 @@ MAP_IDS = \
     ald1a, ald1c, tar1a,\
     coa1a, cor1a, cor1c,\
     dea1a, dea1c, mus1a, mus1c,\
-    = range(-1, 30)
+    = range(-1, 40)
 
 MAP_ID_NAMES = [
     "unknown",
