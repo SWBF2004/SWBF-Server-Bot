@@ -1,3 +1,4 @@
+import logging
 from time import time
 from discord import Client, Intents
 from discord.ext import tasks
@@ -14,21 +15,27 @@ class Server:
 class EventNames:
     PLAYER_JOINING = 'player_joining'
     PLAYER_JOINED = 'player_joined'
-    PLAYER_NAMES = 'player_names'
     MAP_CHANGED = 'map_changed'
 
 
 class ServerBot(Client):
-    def __init__(self, pid: int, config: dict):
+    def __init__(self, pid: int, config: dict, quiet_start: bool = False):
         super().__init__(intents=Intents.default())
+
+        self.__quiet_start = quiet_start
 
         self.__server = Server()
         self.__process = Process(pid)
         self.__config = config
+
+        # Offsets
         self.__offsets = config['OFFSETS']
+        self.__names = self.__offsets['names']
+        self.__stats = self.__offsets['stats']
+
+        # Events
         self.__player_joining = BitCountProperty(PostiveChangeEvent(), **self.__offsets[EventNames.PLAYER_JOINING])
         self.__player_joined = BitCountProperty(PostiveChangeEvent(), **self.__offsets[EventNames.PLAYER_JOINED])
-        self.__player_names = StringProperty(ChangeEvent(), **self.__offsets[EventNames.PLAYER_NAMES])
         self.__map_changed = StringProperty(ChangeEvent(), **self.__offsets[EventNames.MAP_CHANGED])
 
         self.__timeout = 0
@@ -39,24 +46,36 @@ class ServerBot(Client):
 
         @self.event
         async def on_player_joining(old: int, new: int):
-            channel = self.get_channel(self.__config['channel'])
-            await channel.send(f'New Player is joining!')
+            channel_count = self.get_channel(self.__config['channel-count'])
+            await channel_count.send(f'New Player is joining!')
 
         @self.event
         async def on_player_joined(old: int, new: int):
-            channel = self.get_channel(self.__config['channel'])
             self.__server.players = new
-            names = '\n'.join(self.get_player_names())
-            await channel.send(f'New Player joined! Player count: {new}')
-            await channel.send(f'Players: >>> {names}')
+
+            tag = ''
+            if self.__server.players > 3:
+                tag += f' <@&{self.__config["role-players>3"]}> '
+            if self.__server.players > 5:
+                tag += f' <@&{self.__config["role-players>5"]}> '
+
+            channel_count = self.get_channel(self.__config['channel-count'])
+            await channel_count.send(f'New Player joined! Player count: {new}')
+
+            channel_names = self.get_channel(self.__config['channel-names'])
+            await channel_names.send(f'{self.format_player_names()}')
 
         @self.event
         async def on_map_changed(old: str, new: str):
-            channel = self.get_channel(self.__config['channel'])
+            channel_map = self.get_channel(self.__config['channel-map'])
             if not old:
-                await channel.send(f'Server is up! Current map: `{Map.from_id_name(new)}`')
+                if not self.__quiet_start:
+                    await channel_map.send(f'Server is up! Current map: `{Map.from_id_name(new)}`')
             else:
-                await channel.send(f'Map is over. Next map is: `{Map.from_id_name(new)}`')
+                await channel_map.send(f'Map is over. Next map is: `{Map.from_id_name(new)}`')
+
+                channel_names = self.get_channel(self.__config['channel-names'])
+                await channel_names.send(f'{self.format_player_names()}')
 
     @tasks.loop(seconds=3)
     async def scan(self):
@@ -69,21 +88,91 @@ class ServerBot(Client):
 
         if time() - self.__timeout > 10:
             if self.__player_joined.read(self.__process):
-                self.__timeout = 0
+                # Do not spam
+                self.__timeout = time()
                 self.dispatch(EventNames.PLAYER_JOINED, *self.__player_joined.get())
 
+    def format_player_names(self, with_stats=True):
+        stats = f''
+
+        if with_stats:
+            for name, stat in zip(self.get_player_names(), self.get_player_stats()):
+                ping, kill, death, cp = stat.values()
+                mod = 1000
+                stats += f'{name:32s}  P:{ping % mod:4d}  K:{kill % mod:3d}  D:{death % mod:3d}  C:{cp % mod:3d}\n'
+
+            if stats:
+                return f'```{stats}```'
+            return ''
+
+        else:
+            names = self.get_player_names()
+            if names:
+                names = "\n".join(names)
+                stats = f'>>> {names}'
+
+        return stats
+
     def get_player_names(self):
-        addr = int(self.__offsets[EventNames.PLAYER_NAMES]["address"], 16)
-        length = max(1, self.__server.players) * 456
-        players = self.__process.read(addr, length)
+        addr = int(self.__names['address'], 16)
+        length = int(self.__names['length'])
 
-        if players[0] == 0x00:
-            return
+        size = max(1, self.__server.players) * length
+        buffer = self.__process.read(addr, size)
 
+        # Parts of the name (after the first character) remain in memory.
+        # However, the first character is set to 0.
+        if buffer[0] == 0x00:
+            return []
+
+        max_name_len = 32
         names = []
         for idx in range(self.__server.players):
-            name = players[idx * 456:idx * 456 + 32].decode(encoding='utf-8').rstrip('\x00')
+            start = idx * length
+
+            name_start = start
+            name_stop = start + max_name_len
+            name = buffer[name_start:name_stop].decode(encoding='utf-8').rstrip('\x00')
             if name[0] != 0x00:
                 names.append(name)
 
         return names
+
+    def get_player_stats(self):
+        addr = int(self.__stats['address'], 16)
+        length = int(self.__stats['length'])
+        
+        size = max(1, self.__server.players) * length
+        buffer = self.__process.read(addr, size)
+
+        l = logging.getLogger()
+        l.debug(buffer)
+
+        stats = []
+        for idx in range(self.__server.players):
+            start = idx * length
+
+            ping_start = start
+            ping_stop = ping_start + 4
+            ping = int.from_bytes(buffer[ping_start:ping_stop], byteorder='little', signed=True)
+
+            kill_start = ping_stop
+            kill_stop = kill_start + 4
+            kill = int.from_bytes(buffer[kill_start:kill_stop], byteorder='little', signed=True)
+
+            death_start = kill_stop
+            death_stop = death_start + 4
+            death = int.from_bytes(buffer[death_start:death_stop], byteorder='little', signed=True)
+
+            cp_start = death_stop
+            cp_stop = cp_start + 4
+            cp = int.from_bytes(buffer[cp_start:cp_stop], byteorder='little', signed=True)
+
+            stats.append({
+                'ping': ping,
+                'kill': kill,
+                'death': death,
+                'cp': cp,
+            })
+
+        return stats

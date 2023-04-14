@@ -23,7 +23,8 @@ def create_argument_parser() -> ArgumentParser:
     parser = ArgumentParser()
     parser.add_argument('-c', '--config', type=str, required=True)
     parser.add_argument('-p', '--pid', type=int, required=True)
-    parser.add_argument('-t', '--type', type=str, choices={'Steam', 'Spy'}, default='Steam')
+    parser.add_argument('-q', '--quiet', action='store_true')
+    #parser.add_argument('-t', '--type', type=str, choices={'Steam', 'Spy'}, default='Steam')
     parser.add_argument('-l', '--log-level', type=str, choices=LOG_NAMES, default='info')
     return parser
 
@@ -31,7 +32,7 @@ def create_argument_parser() -> ArgumentParser:
 def main(args: Namespace):
     config = json.load(open(args.config, 'r'))
 
-    bot = ServerBot(args.pid, config)
+    bot = ServerBot(args.pid, config, args.quiet)
     bot.run(config['TOKEN'])
 
 

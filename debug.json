@@ -1,6 +1,10 @@
 {
-  "TOKEN": "x",
-  "channel": 1,
+  "TOKEN": "",
+  "channel-map": 1093910065179803768,
+  "channel-count": 1093910065179803768,
+  "channel-names": 1093910065179803768,
+  "role-players>3": 1093910065179803768,
+  "role-players>5": 1093910065179803768,
   "OFFSETS" : {
     "player_joined": {
       "address": "518740",
@@ -10,13 +14,17 @@
       "address": "503FF0",
       "length": 4
     },
-    "player_names": {
+    "names": {
       "address": "51107C",
-      "length": 1024
+      "length": 456
     },
     "map_changed": {
       "address": "4E6D6C",
       "length": 8
+    },
+    "stats": {
+      "address": "504034",
+      "length": 60
     }
   }
 }
