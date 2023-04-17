@@ -2,7 +2,7 @@ import logging
 from time import time
 from discord import Client, Intents
 from discord.ext import tasks
-from util.process import Process
+from util.process import ProcessReadError
 from swbf.maps import Map
 from server_bot.events import *
 
@@ -16,6 +16,7 @@ class EventNames:
     PLAYER_JOINING = 'player_joining'
     PLAYER_JOINED = 'player_joined'
     MAP_CHANGED = 'map_changed'
+    SERVER_DOWN = 'server_down'
 
 
 class ServerBot(Client):
@@ -38,7 +39,10 @@ class ServerBot(Client):
         self.__player_joined = BitCountProperty(PostiveChangeEvent(), **self.__offsets[EventNames.PLAYER_JOINED])
         self.__map_changed = StringProperty(ChangeEvent(), **self.__offsets[EventNames.MAP_CHANGED])
 
-        self.__timeout = 0
+        self.__join_timer = time()
+        self.__join_timeout = int(config['join-timeout'])
+        self.__tag_timer = time()
+        self.__tag_timeout = int(config['tag-timeout'])
 
         @self.event
         async def on_ready():
@@ -53,44 +57,65 @@ class ServerBot(Client):
         async def on_player_joined(old: int, new: int):
             self.__server.players = new
 
-            tag = ''
-            if self.__server.players > 3:
-                tag += f' <@&{self.__config["role-players>3"]}> '
-            if self.__server.players > 5:
-                tag += f' <@&{self.__config["role-players>5"]}> '
+            if time() - self.__join_timer > self.__join_timeout:
+                self.__join_timer = time()
 
-            channel_count = self.get_channel(self.__config['channel-count'])
-            await channel_count.send(f'New Player joined! Player count: {new}')
+                tag = ''
+                if time() - self.__tag_timer > self.__tag_timeout:
+                    self.__tag_timer = time()
+                    if self.__server.players == 3:
+                        tag += f' <@&{self.__config["role-players=3"]}> '
+                    if self.__server.players == 5:
+                        tag += f' <@&{self.__config["role-players=5"]}> '
 
-            channel_names = self.get_channel(self.__config['channel-names'])
-            await channel_names.send(f'{self.format_player_names()}')
+                channel_count = self.get_channel(self.__config['channel-count'])
+                await channel_count.send(f'New Player joined! Player count: {new} {tag}')
+
+            player_names = self.format_player_names()
+            if player_names:
+                channel_names = self.get_channel(self.__config['channel-names'])
+                await channel_names.send(f'{player_names}')
 
         @self.event
         async def on_map_changed(old: str, new: str):
             channel_map = self.get_channel(self.__config['channel-map'])
             if not old:
-                if not self.__quiet_start:
-                    await channel_map.send(f'Server is up! Current map: `{Map.from_id_name(new)}`')
+                if not new:
+                    self.dispatch(EventNames.SERVER_DOWN)
+                else:
+                    if not self.__quiet_start:
+                        await channel_map.send(f'Server is up! Current map: `{Map.from_id_name(new)}`')
             else:
+                # Update timeout after map change
+                self.__join_timer = time()
+
                 await channel_map.send(f'Map is over. Next map is: `{Map.from_id_name(new)}`')
 
-                channel_names = self.get_channel(self.__config['channel-names'])
-                await channel_names.send(f'{self.format_player_names()}')
+                names = self.format_player_names()
+                if names:
+                    channel_names = self.get_channel(self.__config['channel-names'])
+                    await channel_names.send(f'{names}')
+
+        @self.event
+        async def on_server_down():
+            channel_status = self.get_channel(self.__config['channel-status'])
+            await channel_status.send(f'ALAAAAAARM!!! SERVER DOOOOOOOWN!!!')
 
     @tasks.loop(seconds=3)
     async def scan(self):
-        # if self.__player_joining.read(self.__process):
-        #     self.dispatch(EventNames.PLAYER_JOINING, *self.__player_joining.get())
+        try:
 
-        if self.__map_changed.read(self.__process):
-            self.__timeout = time()
-            self.dispatch(EventNames.MAP_CHANGED, *self.__map_changed.get())
+            # if self.__player_joining.read(self.__process):
+            #     self.dispatch(EventNames.PLAYER_JOINING, *self.__player_joining.get())
 
-        if time() - self.__timeout > 10:
+            if self.__map_changed.read(self.__process):
+                self.dispatch(EventNames.MAP_CHANGED, *self.__map_changed.get())
+
             if self.__player_joined.read(self.__process):
-                # Do not spam
-                self.__timeout = time()
                 self.dispatch(EventNames.PLAYER_JOINED, *self.__player_joined.get())
+
+        except ProcessReadError as e:
+            self.dispatch(EventNames.SERVER_DOWN)
 
     def format_player_names(self, with_stats=True):
         stats = f''

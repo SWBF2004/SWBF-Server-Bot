@@ -3,6 +3,10 @@ from ctypes import wintypes
 import win32process
 
 
+class ProcessReadError(BaseException):
+    def __int__(self):
+        super().__init__('Read Error')
+
 class ProcessPermission:
     ERROR_PARTIAL_COPY = 0x00000012B
     PROCESS_VM_READ = 0x00000010
