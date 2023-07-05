@@ -39,10 +39,12 @@ class ServerBot(Client):
         self.__player_joined = BitCountProperty(PostiveChangeEvent(), **self.__offsets[EventNames.PLAYER_JOINED])
         self.__map_changed = StringProperty(ChangeEvent(), **self.__offsets[EventNames.MAP_CHANGED])
 
-        self.__join_timer = time()
+        self.__join_timer = 0
         self.__join_timeout = int(config['join-timeout'])
-        self.__tag_timer = time()
-        self.__tag_timeout = int(config['tag-timeout'])
+        self.__tag_timer_3 = 0
+        self.__tag_timeout_3 = int(config['tag-timeout-3'])
+        self.__tag_timer_5 = 0
+        self.__tag_timeout_5 = int(config['tag-timeout-5'])
 
         @self.event
         async def on_ready():
@@ -61,11 +63,14 @@ class ServerBot(Client):
                 self.__join_timer = time()
 
                 tag = ''
-                if time() - self.__tag_timer > self.__tag_timeout:
-                    self.__tag_timer = time()
+                if time() - self.__tag_timer_3 > self.__tag_timeout_3:
                     if self.__server.players == 3:
+                        self.__tag_timer_3 = time()
                         tag += f' <@&{self.__config["role-players=3"]}> '
+
+                if time() - self.__tag_timer_5 > self.__tag_timeout_5:
                     if self.__server.players == 5:
+                        self.__tag_timer_5 = time()
                         tag += f' <@&{self.__config["role-players=5"]}> '
 
                 channel_count = self.get_channel(self.__config['channel-count'])
@@ -78,13 +83,12 @@ class ServerBot(Client):
 
         @self.event
         async def on_map_changed(old: str, new: str):
+            if not new:
+                self.dispatch(EventNames.SERVER_DOWN)
+
             channel_map = self.get_channel(self.__config['channel-map'])
-            if not old:
-                if not new:
-                    self.dispatch(EventNames.SERVER_DOWN)
-                else:
-                    if not self.__quiet_start:
-                        await channel_map.send(f'Server is up! Current map: `{Map.from_id_name(new)}`')
+            if not old and not self.__quiet_start:
+                await channel_map.send(f'Server is up! Current map: `{Map.from_id_name(new)}`')
             else:
                 # Update timeout after map change
                 self.__join_timer = time()
@@ -157,7 +161,7 @@ class ServerBot(Client):
 
             name_start = start
             name_stop = start + max_name_len
-            name = buffer[name_start:name_stop].decode(encoding='utf-8').rstrip('\x00')
+            name = buffer[name_start:name_stop].decode(encoding='latin-1').rstrip('\x00')
             if name[0] != 0x00:
                 names.append(name)
 

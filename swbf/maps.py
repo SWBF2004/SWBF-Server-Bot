@@ -1,6 +1,6 @@
 MAP_IDS = \
     unknown, \
-    bes1a, bes1r, bes2a, bes2r, \
+    bes1a, bes1r, bes1c, bes2a, bes2r, bes2c, \
     end1a, geo1r, hot1i, kam1c, \
     kas1c, kas1i, kas2c, kas2i, \
     nab1c, nab1i, nab2a, nab2c, \
@@ -11,11 +11,11 @@ MAP_IDS = \
     ald1a, ald1c, tar1a,\
     coa1a, cor1a, cor1c,\
     dea1a, dea1c, mus1a, mus1c,\
-    = range(-1, 40)
+    = range(-1, 42)
 
 MAP_ID_NAMES = [
     "unknown",
-    "bes1a", "bes1r", "bes2a", "bes2r",
+    "bes1a", "bes1r", "bes1c", "bes2a", "bes2r", "bes2c",
     "end1a", "geo1r", "hot1i", "kam1c",
     "kas1c", "kas1i", "kas2c", "kas2i",
     "nab1c", "nab1i", "nab2a", "nab2c",
@@ -30,7 +30,7 @@ MAP_ID_NAMES = [
 
 MAP_NAMES = [
     "Unkown",
-    "Bespin: Platforms GCW", "Bespin: Platforms CW", "Bespin: Cloud City GCW", "Bespin: Cloud City CW",
+    "Bespin: Platforms GCW", "Bespin: Platforms CW", "Bespin: Platforms CW", "Bespin: Cloud City GCW", "Bespin: Cloud City CW", "Bespin: Cloud City CW",
     "Endor: Bunker", "Geonosis: Spire", "Hoth: Echo Base", "Kamino: Tipoca City",
     "Kashyyyk: Islands CW", "Kashyyyk: Islands GCW", "Kashyyyk: Docks CW", "Kashyyyk: Docks GCW",
     "Naboo: Plains CW", "Naboo: Plains GCW", "Naboo: Theed GCW", "Naboo: Theed CW",
