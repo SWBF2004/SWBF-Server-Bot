@@ -45,6 +45,8 @@ class ServerBot(Client):
         self.__tag_timeout_3 = int(config['tag-timeout-3'])
         self.__tag_timer_5 = 0
         self.__tag_timeout_5 = int(config['tag-timeout-5'])
+        self.__tag_timer_10 = 0
+        self.__tag_timeout_10 = int(config['tag-timeout-10'])
 
         @self.event
         async def on_ready():
@@ -73,6 +75,11 @@ class ServerBot(Client):
                         self.__tag_timer_5 = time()
                         tag += f' <@&{self.__config["role-players=5"]}> '
 
+                if time() - self.__tag_timer_10 > self.__tag_timeout_10:
+                    if self.__server.players == 10:
+                        self.__tag_timer_10 = time()
+                        tag += f' <@&{self.__config["role-players=10"]}> '
+
                 channel_count = self.get_channel(self.__config['channel-count'])
                 await channel_count.send(f'New Player joined! Player count: {new} {tag}')
 
@@ -83,15 +90,20 @@ class ServerBot(Client):
 
         @self.event
         async def on_map_changed(old: str, new: str):
-            if not new:
-                self.dispatch(EventNames.SERVER_DOWN)
-
             channel_map = self.get_channel(self.__config['channel-map'])
-            if not old and not self.__quiet_start:
-                await channel_map.send(f'Server is up! Current map: `{Map.from_id_name(new)}`')
+            if not old:
+                if not new:
+                    self.dispatch(EventNames.SERVER_DOWN)
+                else:
+                    if not self.__quiet_start:
+                        await channel_map.send(f'Server is up! Current map: `{Map.from_id_name(new)}`')
             else:
                 # Update timeout after map change
                 self.__join_timer = time()
+
+                if not new:
+                    self.dispatch(EventNames.SERVER_DOWN)
+                    return
 
                 await channel_map.send(f'Map is over. Next map is: `{Map.from_id_name(new)}`')
 
@@ -162,7 +174,7 @@ class ServerBot(Client):
             name_start = start
             name_stop = start + max_name_len
             name = buffer[name_start:name_stop].decode(encoding='latin-1').rstrip('\x00')
-            if name[0] != 0x00:
+            if name and name[0] != 0x00:
                 names.append(name)
 
         return names
@@ -170,7 +182,7 @@ class ServerBot(Client):
     def get_player_stats(self):
         addr = int(self.__stats['address'], 16)
         length = int(self.__stats['length'])
-        
+
         size = max(1, self.__server.players) * length
         buffer = self.__process.read(addr, size)
 

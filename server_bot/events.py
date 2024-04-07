@@ -63,4 +63,4 @@ class StringProperty(ServerProperty):
         super().__init__(event, address, length, "")
 
     def convert(self, new_value: bytes) -> str:
-        return new_value.decode(encoding='latin-1').rstrip('\x00')
+        return new_value.decode(encoding='utf-8').rstrip('\x00')
