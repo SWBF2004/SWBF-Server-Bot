@@ -66,17 +66,17 @@ class ServerBot(Client):
 
                 tag = ''
                 if time() - self.__tag_timer_3 > self.__tag_timeout_3:
-                    if self.__server.players == 3:
+                    if 3 <= self.__server.players < 5:
                         self.__tag_timer_3 = time()
                         tag += f' <@&{self.__config["role-players=3"]}> '
 
                 if time() - self.__tag_timer_5 > self.__tag_timeout_5:
-                    if self.__server.players == 5:
+                    if 5 <= self.__server.players < 10:
                         self.__tag_timer_5 = time()
                         tag += f' <@&{self.__config["role-players=5"]}> '
 
                 if time() - self.__tag_timer_10 > self.__tag_timeout_10:
-                    if self.__server.players == 10:
+                    if 10 <= self.__server.players:
                         self.__tag_timer_10 = time()
                         tag += f' <@&{self.__config["role-players=10"]}> '
 
